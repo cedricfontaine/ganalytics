@@ -40,7 +40,7 @@ class Ganalytics extends Module
 	{
 		$this->name = 'ganalytics';
 		$this->tab = 'analytics_stats';
-		$this->version = '2.0.9';
+		$this->version = '2.0.8';
 		$this->author = 'PrestaShop';
 		$this->module_key = 'fd2aaefea84ac1bb512e6f1878d990b8';
 		$this->bootstrap = true;
@@ -124,8 +124,8 @@ class Ganalytics extends Module
 			$tab = new Tab($id_tab);
 			return $tab->delete();
 		}
-
-		return true;
+		else
+			return false;
 	}
 
 	public function displayForm()
@@ -271,7 +271,7 @@ class Ganalytics extends Module
 		if (Validate::isLoadedObject($order))
 		{
 			$ga_order_sent = Db::getInstance()->getValue('SELECT sent FROM `'._DB_PREFIX_.'ganalytics` WHERE id_order = '.(int)$order->id);
-			if ($ga_order_sent === false)
+			if ($ga_order_sent === false && $order->id_customer == $this->context->cookie->id_customer)
 			{
 				$order_products = array();
 				$cart = new Cart($order->id_cart);
@@ -648,20 +648,23 @@ class Ganalytics extends Module
 
 			$this->context->smarty->assign('GA_ACCOUNT_ID', $ga_account_id);
 
-			$ga_scripts = '';
-			$ga_order_records = Db::getInstance()->ExecuteS('SELECT * FROM `'._DB_PREFIX_.'ganalytics` WHERE sent = 0 AND DATE_ADD(date_add, INTERVAL 20 minute) < NOW()');
+			if ($this->context->controller->controller_name == 'AdminOrders')
+			{
+				$ga_scripts = '';
+				$ga_order_records = Db::getInstance()->ExecuteS('SELECT * FROM `'._DB_PREFIX_.'ganalytics` WHERE sent = 0 AND DATE_ADD(date_add, INTERVAL 30 minute) < NOW()');
 
-			if ($ga_order_records)
-				foreach ($ga_order_records as $row)
-				{
-					$transaction = $this->wrapOrder($row['id_order']);
-					if (!empty($transaction))
+				if ($ga_order_records)
+					foreach ($ga_order_records as $row)
 					{
-						$transaction = Tools::jsonEncode($transaction);
-						$ga_scripts .= 'MBG.addTransaction('.$transaction.');';
+						$transaction = $this->wrapOrder($row['id_order']);
+						if (!empty($transaction))
+						{
+							Db::getInstance()->execute('UPDATE `'._DB_PREFIX_.'ganalytics` SET date_add = NOW() WHERE id_order = '.(int)$row['id_order'].' LIMIT 1');
+							$transaction = Tools::jsonEncode($transaction);
+							$ga_scripts .= 'MBG.addTransaction('.$transaction.');';
+						}
 					}
-				}
-
+			}
 			return $js.$this->_getGoogleAnalyticsTag(true).$this->_runJs($ga_scripts,1);
 		}
 		else return $js;
@@ -730,29 +733,26 @@ class Ganalytics extends Module
 			self::$products[] = (int)Tools::getValue('id_product');
 			$ga_products = $this->wrapProduct($add_product, $cart, 0, true);
 
-			if (array_key_exists('id_product_attribute', $ga_products) && $ga_products['id_product_attribute'] != '' && $ga_products['id_product_attribute'] != 0)
+			if ($ga_products['id_product_attribute'] != '' && $ga_products['id_product_attribute'] != 0)
 				$id_product = $ga_products['id_product_attribute'];
 			else
 				$id_product = Tools::getValue('id_product');
 
-			if (isset($this->context->cookie->ga_cart))
-				$gacart = unserialize($this->context->cookie->ga_cart);
-			else
-				$gacart = array();
+			$gacart = unserialize($this->context->cookie->ga_cart);
 
 			if ($cart['removeAction'] == 'delete')
 				$ga_products['quantity'] = -1;
 			elseif ($cart['extraAction'] == 'down')
 			{
 				if (array_key_exists($id_product, $gacart))
-					$ga_products['quantity'] = $gacart[$id_product]['quantity'] - $cart['qty'];
+					$ga_products['quantity'] = $gacart['quantity'] - $cart['qty'];
 				else
 					$ga_products['quantity'] = $cart['qty'] * -1;					
 			}
 			elseif (Tools::getValue('step') <= 0) // Sometimes cartsave is called in checkout
 			{
 				if (array_key_exists($id_product, $gacart))
-					$ga_products['quantity'] = $gacart[$id_product]['quantity'] + $cart['qty'];
+					$ga_products['quantity'] = $gacart['quantity'] + $cart['qty'];
 			}
 
 			$gacart[$id_product] = $ga_products;
