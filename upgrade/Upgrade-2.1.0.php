@@ -25,12 +25,12 @@
 */
 if (!defined('_PS_VERSION_'))
 	exit;
-function upgrade_module_2_0_0($object)
+function upgrade_module_2_1_0($object)
 {
 	Configuration::updateValue('GANALYTICS', '2.1.0');
 	return Db::getInstance()->execute('
-		ALTER TABLE `'._DB_PREFIX_.'ganalytics` (
+		ALTER TABLE `'._DB_PREFIX_.'ganalytics`
 		  ADD `id_customer` int(10) NOT NULL,
-		  ADD `id_shop` int(11) NOT NULL
+		  ADD `id_shop` int(11) NOT NULL'
 		);
 }
