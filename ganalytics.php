@@ -667,8 +667,9 @@ class Ganalytics extends Module
 							$ga_scripts .= 'MBG.addTransaction('.$transaction.');';
 						}
 					}
+				return $js.$this->_getGoogleAnalyticsTag(true).$this->_runJs($ga_scripts,1);	
 			}
-			return $js.$this->_getGoogleAnalyticsTag(true).$this->_runJs($ga_scripts,1);
+			
 		}
 		else return $js;
 	}
